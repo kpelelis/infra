@@ -1,0 +1,47 @@
+version: "3"
+services:
+  traefik:
+    image: traefik:v2.7
+    container_name: traefik
+    networks:
+      - gw-proxy
+    command:
+      - --api
+      - --api.insecure
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${CERT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.to=webssl
+      - --entrypoints.webssl.address=:443
+      - --entrypoints.webssl.address=:443
+      - --entrypoints.webssl.http.tls.certResolver=letsencrypt
+      - --entrypoints.webssl.http.tls.domains[0].main=*.${DOMAIN}
+      - --entrypoints.webssl.http.tls=true
+      - --providers.docker
+    ports:
+      - "80:80"
+      - "443:443"
+      - "9090:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./volumes/certs:/letsencrypt
+    environment:
+      - CF_API_KEY=${CF_API_KEY}
+      - CF_API_EMAIL=${CF_API_EMAIL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=webssl"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - 'traefik.http.routers.traefik.middlewares=strip'
+      - 'traefik.http.middlewares.strip.stripprefix.prefixes=/traefik'
+      - "traefik.http.routers.traefik.rule=Host(`lb.${DOMAIN}`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+
+networks:
+  gw-proxy:
+    name: gateway-proxy
