@@ -4,7 +4,10 @@ services:
     image: traefik:v2.7
     container_name: traefik
     networks:
-      - gw-proxy
+      gw-proxy:
+      wireguard:
+        ipv4_address: 10.2.1.2
+
     command:
       - --api
       - --api.insecure
@@ -40,8 +43,13 @@ services:
       - 'traefik.http.middlewares.strip.stripprefix.prefixes=/traefik'
       - "traefik.http.routers.traefik.rule=Host(`lb.${DOMAIN}`)"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
-
+      - "traefik.http.services.ha.loadbalancer.server.url=http://${HA_IP}:8123"
+      - "traefik.http.routers.ha.rule=Host(`ha.${DOMAIN}`)"
+      - "traefik.http.routers.ha.entrypoints=web"
+      - "traefik.http.routers.ha.service=ha"
 
 networks:
   gw-proxy:
     name: gateway-proxy
+  wireguard:
+    external: true

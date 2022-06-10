@@ -132,7 +132,33 @@ Use a pin for local network devices
 
 If you want a dashboard with links, then you can visit `https://index.${your-domain}` and setup the URLs accordingly
 
+### Wireguard
+
+Provided that you have a wireguard network setup, you can expose this infrastructure directly by only routing traffic
+to Traefik container. We assume the following the wireguard subnet is 10.2.0.0/24 and the IP of the machine running
+the infrastructure is 10.2.0.2. You can set these accordingly. We need to do the following steps.
+
+1. Make our public DNS provider (Cloudflare) resolve to the private wireguard IP for the wildcard domain. In this
+   case add an A record for `*.<your-domain>` that resolves to 10.2.0.2
+2. Create a new bridge network on docker with a different subnet
+   ```bash
+   $ docker network create --subnet 10.2.1.0/24 wireguard
+   ```
+   The compose file will try to bind the IP `10.2.1.2` so if you want a different subnet you need to change this
+   as well
+3. Add iptables rules to [DNAT](http://linux-ip.net/html/nat-dnat.html) the traffic coming from wireguard to the
+   docker network
+
+   ```bash
+   # Accept traffic both on port 80 and 443
+   $ sudo iptables -A FORWARD -i wg0 -p tcp --dports 80,443 --dst 10.2.0.2/32 -j ACCEPT
+   # DNAT traffic to docker network
+   $ sudo iptables -A PREROUTING -t nat -i wg0 -p tcp --dport 80 -j DNAT --dst 10.2.0.2/32 --to 10.3.0.2:80
+   $ sudo iptables -A PREROUTING -t nat -i wg0 -p tcp --dport 443 -j DNAT --dst 10.2.0.2/32 --to 10.3.0.2:443
+   ```
+   To make these rules persistent you must use a tool like iptables-persistent
+
 ### TODO
 
-- [] Migrate to Kubernetes/Nomad
-- [] Wireguard
+- [ ] Migrate to Kubernetes/Nomad
+- [X] Wireguard
